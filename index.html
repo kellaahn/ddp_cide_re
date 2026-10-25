@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <link rel="stylesheet" href="style.css">
+
+    <script>
+  (function(d) {
+    var config = {
+      kitId: 'tcx3mrh',
+      scriptTimeout: 3000,
+      async: true
+    },
+    h=d.documentElement,t=setTimeout(function(){h.className=h.className.replace(/\bwf-loading\b/g,"")+" wf-inactive";},config.scriptTimeout),tk=d.createElement("script"),f=false,s=d.getElementsByTagName("script")[0],a;h.className+=" wf-loading";tk.src='https://use.typekit.net/'+config.kitId+'.js';tk.async=true;tk.onload=tk.onreadystatechange=function(){a=this.readyState;if(f||a&&a!="complete"&&a!="loaded")return;f=true;clearTimeout(t);try{Typekit.load(config)}catch(e){}};s.parentNode.insertBefore(tk,s)
+  })(document);
+</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gowun+Batang&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="top">
+        <header class="header">
+            <button class="add-btn" type="button" aria-label="창 추가">+</button>
+            <p class="title">가벼운 미술관</p>
+        </header>
+    </div>
+
+    <main class="windows"></main>
+
+    <!-- 전시관이 하나도 없을 때만 보이는 글귀 -->
+    <div class="intro">
+        <p>난잡한 현대미술을 바라보는 우리는 맥락을 놓칠까봐 의심과 회초리를 들고 바라본다.</p>
+        <p>그러나 고전미술을 대할때 우리는 그저 그 작품을 맥락의 의심 없이 ‘틀안에 갇힌 단순함’으로 대하게 된다</p>
+        <p>나는 현대사회의 도파민 과다 세상에 틀을 던지고 싶다.</p>
+        <p>그리고 그 틀안에 갇혀 작품을 온전히 느낄수 있게 맥락을 놓칠까 무서운 사람들을 작품을 즐기는 온전함으로 인도해주고 싶다.</p>
+    </div>
+
+    <!-- + 버튼 누르면 가운데에 뜨는 창 -->
+    <dialog class="modal">
+        <button class="modal-close" type="button" aria-label="닫기">×</button>
+        <form class="modal-body">
+            <p class="form-number">전시관 <span class="hall-num">1</span></p>
+
+            <label class="field">
+                <span>전시관 이름</span>
+                <input type="text" name="name" required>
+            </label>
+            <label class="field">
+                <span>만든이</span>
+                <input type="text" name="maker" required>
+            </label>
+            <label class="field">
+                <span>전시 주제</span>
+                <input type="text" name="theme">
+            </label>
+            <label class="field">
+                <span>전시 설명</span>
+                <textarea name="desc" rows="5"></textarea>
+            </label>
+
+            <button class="submit-btn" type="submit">전시관 만들기</button>
+        </form>
+    </dialog>
+
+    <!-- 전시관 N 누르면 들어가는 전시 화면: 스크롤하면 작품이 옆으로 넘어감 -->
+    <div class="gallery" hidden>
+        <header class="gallery-top">
+            <button class="gallery-home" type="button">← 메인으로</button>
+            <button class="design-btn" type="button">전시관 설계하기</button>
+        </header>
+
+        <div class="gallery-track"></div>
+
+        <div class="gallery-caption">
+            <p class="cap-num"></p>
+            <p class="cap-title"></p>
+            <p class="cap-artist"></p>
+        </div>
+        <p class="gallery-note"></p>
+
+        <footer class="gallery-bottom">
+            <p class="g-theme"></p>
+            <p class="g-desc"></p>
+        </footer>
+    </div>
+
+    <!-- 전시관 설계하기: 빈 곳에 사진 올리면 노드로 놓임 -->
+    <div class="design" hidden>
+        <div class="design-canvas">
+            <svg class="design-lines"></svg>
+            <p class="design-hint">빈 곳을 클릭하거나 사진을 끌어다 놓으세요</p>
+        </div>
+        <button class="design-back" type="button">← 전시관으로</button>
+        <p class="design-title"></p>
+        <input class="design-file" type="file" accept="image/*" multiple hidden>
+        <p class="design-status"></p>
+    </div>
+
+    <!-- Supabase: 모든 사람이 같은 전시관을 보도록 저장 -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+    <script src="sketch.js"></script>
+</body>
+</html>
