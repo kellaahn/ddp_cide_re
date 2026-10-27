@@ -345,6 +345,11 @@ function setCommentMode(on) {
   gallery.classList.toggle('comment-mode', on);
   commentBtn.classList.toggle('is-on', on);
   commentBtn.setAttribute('aria-pressed', on);
+  // 댓글 모드가 아닐 땐 댓글을 고칠 수 없게 (쓰던 글은 저장하고 끝냄)
+  commentLayer.querySelector('.comment-text:focus')?.blur();
+  commentLayer.querySelectorAll('.comment-text').forEach((el) => {
+    el.contentEditable = on ? 'plaintext-only' : 'false';
+  });
 }
 
 // ───────── 댓글: 클릭한 자리에 바로 글쓰기 ─────────
@@ -405,7 +410,7 @@ async function saveComment(c) {
 function makeComment(c) {
   const el = document.createElement('div');
   el.className = 'comment-text';
-  el.contentEditable = 'plaintext-only';
+  el.contentEditable = gallery.classList.contains('comment-mode') ? 'plaintext-only' : 'false';
   el.spellcheck = false;
   el.style.left = c.x * 100 + '%';
   el.style.top = c.y * 100 + '%';

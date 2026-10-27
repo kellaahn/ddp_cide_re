@@ -692,3 +692,9 @@ textarea.node-field{
   pointer-events: auto;
   cursor: text;
 }
+/* 댓글 모드가 아닐 땐 댓글은 보기만 (클릭·선택·커서 반응 없음) */
+.gallery:not(.comment-mode) .comment-text{
+  pointer-events: none;
+  user-select: none;
+  cursor: inherit;
+}
