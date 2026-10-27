@@ -324,8 +324,10 @@ body.loaded .windows:empty + .intro{
   align-items: flex-end;
 }
 .gallery-top{
-  justify-content: flex-end;   /* 전시관 설계하기: 오른쪽 위 */
+  justify-content: flex-end;   /* [댓글 달기][전시관 설계하기]: 오른쪽 위 */
+  gap: 8px;                    /* 두 버튼 사이 간격 */
 }
+.comment-btn,
 .design-btn,
 .gallery-home{
   padding: 8px 16px;
@@ -633,4 +635,60 @@ textarea.node-field{
   left: 16px;
   bottom: 14px;
   pointer-events: none;
+}
+
+/* ───────── 댓글 모드 ('댓글 달기' 버튼) ───────── */
+/* 꺼짐: 마우스 올리면 연한 회색 / 켜짐: 검은색 유지 */
+.comment-btn:hover{
+  background: rgba(17, 17, 17, 0.08);
+}
+.comment-btn.is-on,
+.comment-btn.is-on:hover{
+  background: #111;
+  color: #f4f3ef;
+}
+/* 가운데 작품 말고는 살짝 흐리게 */
+.art-item{
+  transition: opacity 0.3s ease, filter 0.3s ease;
+}
+.gallery.comment-mode .art-item:not(.is-active){
+  opacity: 0.25;
+  filter: blur(1.5px);
+}
+/* 커서 = 말풍선 댓글 기호 (뾰족한 왼쪽 아래 끝이 가리키는 지점), 가운데 작품 밖에서만 */
+.gallery.comment-mode,
+.gallery.comment-mode .art-item:not(.is-active){
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 26 26'%3E%3Cpath d='M2 24V13A11 11 0 1 1 13 24Z' fill='%23fff' stroke='%23111' stroke-width='1' stroke-linejoin='round'/%3E%3C/svg%3E") 2 24, crosshair;
+}
+.gallery.comment-mode .art-item.is-active{
+  cursor: default;                 /* 가운데 작품 위에서는 보통 커서 */
+}
+.gallery.comment-mode button{
+  cursor: pointer;
+}
+
+/* 클릭한 자리에 쓰는 글: 상자 없이 글자와 깜빡이는 커서만 */
+.comment-layer{
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+.comment-text{
+  position: absolute;
+  width: max-content;       /* 작품 바깥 오른쪽에서도 한 줄로 (260px 넘으면 줄바꿈) */
+  min-width: 2px;
+  max-width: 260px;
+  font-family: "Gowun Batang", serif;
+  font-size: 14px;
+  line-height: 1.5;
+  letter-spacing: 0;
+  color: #111;
+  white-space: pre-wrap;
+  word-break: keep-all;
+  outline: none;
+  caret-color: #111;
+  pointer-events: auto;
+  cursor: text;
 }

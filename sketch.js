@@ -194,18 +194,22 @@ function openGallery(num) {
       const l2 = 20 + ((i * 53) % 45);
       item.style.background = `linear-gradient(160deg, hsl(30, 6%, ${l1}%), hsl(30, 6%, ${l2}%))`;
     }
-    item.addEventListener('click', () => goTo(i));
+    item.addEventListener('click', () => {
+      if (!gallery.classList.contains('comment-mode')) goTo(i);   // 댓글 모드에선 넘기지 않고 글쓰기
+    });
     track.appendChild(item);
     items.push(item);
   }
 
   pos = target = 0;
+  shownActive = -1;
   gallery.hidden = false;
   layout();
   requestAnimationFrame(() => gallery.classList.add('is-open'));
 }
 
 function closeGallery() {
+  setCommentMode(false);
   gallery.classList.remove('is-open');
   setTimeout(() => { gallery.hidden = true; }, 400);
 }
@@ -232,15 +236,16 @@ function layout() {
   const cb = xs[b] + sizes[b].w / 2;
   const offset = window.innerWidth / 2 - (ca + (cb - ca) * (pos - a));
 
+  const active = Math.round(pos);
   items.forEach((item, i) => {
     const s = sizes[i];
     item.style.width = s.w + 'px';
     item.style.height = s.h + 'px';
     item.style.transform = `translate(${xs[i] + offset}px, ${centerY - s.h / 2}px)`;
+    item.classList.toggle('is-active', i === active);   // 댓글 모드에서 이 작품만 또렷하게
   });
 
   // 가운데 작품 왼쪽 위에 번호 + 제목
-  const active = Math.round(pos);
   const s = sizes[active];
   const art = artworks[active];
   caption.querySelector('.cap-num').textContent = `(${String(active + 1).padStart(2, '0')})`;
@@ -256,6 +261,16 @@ function layout() {
   const fade = Math.max(0, 1 - Math.abs(pos - active) * 4);
   caption.style.opacity = fade;
   note.style.opacity = fade;
+
+  // 댓글 층: 가운데 작품에 딱 겹치게. 가운데 작품이 바뀌면 그 작품에 쓴 글만 보이게
+  commentLayer.style.transform = `translate(${xs[active] + offset}px, ${centerY - s.h / 2}px)`;
+  commentLayer.style.width = s.w + 'px';
+  commentLayer.style.height = s.h + 'px';
+  commentLayer.style.opacity = fade;
+  if (active !== shownActive) {
+    shownActive = active;
+    renderComments();
+  }
 }
 
 // 부드럽게 target 쪽으로 이동
@@ -291,7 +306,10 @@ document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closeDesign();
     return;
   }
-  if (e.key === 'Escape') closeGallery();
+  if (e.key === 'Escape') {
+    if (gallery.classList.contains('comment-mode')) setCommentMode(false);   // 댓글 모드면 모드만 끄기
+    else closeGallery();
+  }
   if (e.key === 'ArrowRight') goTo(Math.round(target) + 1);
   if (e.key === 'ArrowLeft') goTo(Math.round(target) - 1);
 });
@@ -300,6 +318,127 @@ window.addEventListener('resize', () => { if (!gallery.hidden) layout(); });
 
 // '← 메인으로': 전시관에서 메인 화면으로
 document.querySelector('.gallery-home').addEventListener('click', closeGallery);
+
+// '댓글 달기' 버튼: 댓글 모드 켜기/끄기
+// 켜지면 가운데 작품 말고는 흐려지고, 커서가 댓글 모양
+const commentBtn = document.querySelector('.comment-btn');
+commentBtn.addEventListener('click', () => {
+  setCommentMode(!gallery.classList.contains('comment-mode'));
+});
+
+function setCommentMode(on) {
+  gallery.classList.toggle('comment-mode', on);
+  commentBtn.classList.toggle('is-on', on);
+  commentBtn.setAttribute('aria-pressed', on);
+}
+
+// ───────── 댓글: 클릭한 자리에 바로 글쓰기 ─────────
+// 위치는 가운데 작품 기준 비율로 기억 → 그 작품이 가운데 올 때만 보임
+// Supabase comments 표에 저장 → 나갔다 와도, 새로고침해도, 다른 사람에게도 그대로
+
+const commentLayer = document.querySelector('.comment-layer');
+const comments = new Map();   // 작품(노드) id → [{ id, node_id, x, y, text }]
+let shownActive = -1;         // 지금 글을 보여주고 있는 작품 순서
+
+// 댓글은 실패해도 알림창 없이 조용히 (comments 표가 아직 없어도 전시는 그대로 보이게)
+async function quiet(query) {
+  if (!db) return { error: true };
+  const res = await query;
+  if (res.error) console.warn('댓글 저장 실패:', res.error.message);
+  return res;
+}
+
+// 사진 있는 작품은 노드 id, 사진 없는 회색 칸은 화면에서만 (저장 안 함)
+function commentKey(i) {
+  return artworks[i] ? artworks[i].id : `empty-${currentNum}-${i}`;
+}
+
+function renderComments() {
+  commentLayer.querySelector('.comment-text:focus')?.blur();   // 쓰던 중에 넘어가도 저장되게
+  commentLayer.innerHTML = '';
+  (comments.get(commentKey(shownActive)) || []).forEach((c) => commentLayer.appendChild(makeComment(c)));
+}
+
+// 처음 열 때 모든 댓글 불러오기
+async function loadComments() {
+  const { data, error } = await quiet(db?.from('comments').select().order('id'));
+  if (error) return;
+  data.forEach((c) => {
+    c.key = c.node_id;
+    if (!comments.has(c.node_id)) comments.set(c.node_id, []);
+    comments.get(c.node_id).push(c);
+  });
+}
+
+// 다 쓴 글 저장: 새 글이면 추가, 있던 글이면 수정
+async function saveComment(c) {
+  if (!c.node_id) return;
+  await c.saving;                                   // 앞의 저장이 끝난 뒤에
+  c.saving = (async () => {
+    if (c.id) {
+      await quiet(db?.from('comments').update({ text: c.text }).eq('id', c.id));
+    } else {
+      const { data: row } = await quiet(db?.from('comments')
+        .insert({ node_id: c.node_id, x: c.x, y: c.y, text: c.text }).select().single());
+      if (row) c.id = row.id;
+    }
+  })();
+  await c.saving;
+}
+
+// 글 한 개: 상자 없이 글자만, 클릭하면 다시 고칠 수 있음
+function makeComment(c) {
+  const el = document.createElement('div');
+  el.className = 'comment-text';
+  el.contentEditable = 'plaintext-only';
+  el.spellcheck = false;
+  el.style.left = c.x * 100 + '%';
+  el.style.top = c.y * 100 + '%';
+  el.textContent = c.text;
+  let before = c.text;
+  el.addEventListener('keydown', (e) => {
+    e.stopPropagation();                                     // 쓰는 중엔 ←→, Esc로 전시관이 움직이지 않게
+    if ((e.key === 'Enter' && !e.shiftKey && !e.isComposing) || e.key === 'Escape') {
+      e.preventDefault();
+      el.blur();                                             // Enter·Esc = 다 썼음 (Shift+Enter = 줄바꿈)
+    }
+  });
+  el.addEventListener('blur', async () => {
+    const text = el.textContent.trim();
+    if (!text) {                                             // 글을 다 지우고 나가면 댓글도 지우기
+      const list = comments.get(c.key) || [];
+      list.splice(list.indexOf(c), 1);
+      el.remove();
+      await c.saving;
+      if (c.id) quiet(db?.from('comments').delete().eq('id', c.id));
+      return;
+    }
+    if (text === before) return;
+    before = c.text = text;
+    saveComment(c);
+  });
+  return el;
+}
+
+// 댓글 모드에서 작품 밖 클릭 → 그 자리에 깜빡이는 커서
+gallery.addEventListener('click', (e) => {
+  if (!gallery.classList.contains('comment-mode')) return;
+  if (e.target.closest('button, .art-item.is-active, .comment-text')) return;
+  const r = commentLayer.getBoundingClientRect();
+  const key = commentKey(shownActive);
+  const c = {
+    key,
+    node_id: artworks[shownActive]?.id,
+    x: (e.clientX - r.left) / r.width,
+    y: (e.clientY - r.top) / r.height,
+    text: '',
+  };
+  if (!comments.has(key)) comments.set(key, []);
+  comments.get(key).push(c);
+  const el = makeComment(c);
+  commentLayer.appendChild(el);
+  el.focus();
+});
 
 // ───────── 전시관 설계하기: 사진 노드 ─────────
 
@@ -647,3 +786,4 @@ async function load() {
 
 // 불러오기가 끝난 뒤에야 "전시관 없음" 글귀를 보여줌 (불러오는 동안 잠깐 깜빡이지 않게)
 load().finally(() => document.body.classList.add('loaded'));
+loadComments();
