@@ -116,6 +116,20 @@ function addWindow(hall) {
 }
 
 // 전시관 지우기: 작품·연결선(DB에서 같이 지워짐)과 사진 파일까지
+// 전시관 순서: 댓글 많은 전시관이 왼쪽(앞), 댓글 수가 같으면 먼저 만든 전시관이 왼쪽
+function hallCommentCount(hall) {
+  return (hall.nodes || []).reduce(
+    (sum, node) => sum + (comments.get(node.id) || []).filter((c) => c.text).length, 0);
+}
+
+function reorderWindows() {
+  const sorted = [...halls].sort((a, b) =>
+    hallCommentCount(b) - hallCommentCount(a) || a.id - b.id);
+  halls.length = 0;
+  windows.innerHTML = '';
+  sorted.forEach(addWindow);   // 번호(전시관 N)도 새 순서대로
+}
+
 async function deleteHall(hall) {
   if (!confirm(`'${hall.name}' 전시관을 지울까요?\n안에 있는 작품도 모두 지워지고, 되돌릴 수 없어요.`)) return;
 
@@ -212,6 +226,7 @@ function closeGallery() {
   setCommentMode(false);
   gallery.classList.remove('is-open');
   setTimeout(() => { gallery.hidden = true; }, 400);
+  reorderWindows();   // 그 사이 달린 댓글 수에 맞춰 순서 다시
 }
 
 // 작품 크기·위치 계산: 가운데에 가까울수록 크게
@@ -785,5 +800,6 @@ async function load() {
 }
 
 // 불러오기가 끝난 뒤에야 "전시관 없음" 글귀를 보여줌 (불러오는 동안 잠깐 깜빡이지 않게)
-load().finally(() => document.body.classList.add('loaded'));
-loadComments();
+Promise.all([load(), loadComments()])
+  .then(reorderWindows)
+  .finally(() => document.body.classList.add('loaded'));
