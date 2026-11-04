@@ -20,6 +20,25 @@ async function run(query) {
   return res;
 }
 
+// 들어오자마자 음악 재생
+// 브라우저는 사용자가 한 번도 누르지 않은 페이지의 소리를 막을 수 있어서,
+// 막히면 처음 클릭·키 입력 때 바로 재생
+const bgm = document.querySelector('.bgm');
+function playBgm() {
+  bgm.play().then(() => {
+    ['pointerdown', 'keydown', 'touchstart'].forEach((t) => document.removeEventListener(t, playBgm));
+  }).catch(() => {});
+}
+['pointerdown', 'keydown', 'touchstart'].forEach((t) => document.addEventListener(t, playBgm));
+playBgm();
+
+// 첫 화면(art.jpg): 2초 보여준 뒤 사라지고 메인 페이지
+const splash = document.querySelector('.splash');
+setTimeout(() => {
+  splash.classList.add('is-gone');
+  splash.addEventListener('transitionend', () => splash.remove(), { once: true });
+}, 2000);
+
 const windows = document.querySelector('.windows');
 const addBtn = document.querySelector('.add-btn');
 const modal = document.querySelector('.modal');
@@ -41,6 +60,11 @@ addBtn.addEventListener('click', () => {
   hallNum.textContent = windows.children.length + 1;
   form.reset();
   modal.showModal();
+});
+
+// 🖌️ 붓 버튼: 그림판 열기 (그림판 코드는 맨 아래)
+document.querySelector('.brush-btn').addEventListener('click', () => {
+  paint.hidden = false;
 });
 
 // × 버튼, 창 바깥 클릭, Esc 키로 닫기
@@ -85,15 +109,20 @@ function addWindow(hall) {
   win.className = 'window';
   win.innerHTML = `
     <div class="window-head">
-      <button class="window-bar" type="button">전시관 ${count} <span>입장 →</span></button>
+      <button class="window-bar" type="button">
+        <span class="bar-name"><span class="bar-num">${count}</span><span class="bar-label">전시관</span></span>
+        <span class="bar-enter">입장 →</span>
+      </button>
       <button class="window-del" type="button" aria-label="전시관 지우기" title="전시관 지우기">×</button>
     </div>
     <div class="window-body">
       <div class="win-info">
         <h2 class="hall-name"></h2>
         <p class="hall-maker"></p>
-        <p class="hall-theme"></p>
-        <p class="hall-desc"></p>
+        <div class="hall-more"><div>
+          <p class="hall-theme"></p>
+          <p class="hall-desc"></p>
+        </div></div>
       </div>
       <div class="win-arts"></div>
     </div>
@@ -170,10 +199,11 @@ function renderWindowArts(num) {
 // ───────── 전시 화면 ─────────
 
 const ART_COUNT = 10;      // 전시관마다 작품 칸 개수 (지금은 빈 칸)
-const SMALL = 0.26;        // 옆 작품 높이 (화면 높이 대비)
-const BIG = 0.56;          // 가운데 작품 높이 (화면 높이 대비)
-const RATIO = 3 / 4;       // 작품 가로:세로
-const GAP = 14;            // 작품 사이 간격(px)
+const SMALL = 0.26;        // 옆 작품 최대 높이 (화면 높이 대비)
+const BIG = 0.56;          // 가운데 작품 최대 높이 (화면 높이 대비)
+const MAX_WIDE = 1.6;      // 최대 너비 = 최대 높이 × 이 값 (가로로 긴 사진이 너무 넓어지지 않게)
+const RATIO = 3 / 4;       // 사진 없는 회색 칸·사진 불러오는 중의 가로:세로
+const GAP = 48;            // 작품 사이 간격(px)
 
 let items = [];            // 작품 칸 요소들
 let pos = 0;               // 지금 가운데에 있는 위치 (소수 = 넘어가는 중)
@@ -202,6 +232,12 @@ function openGallery(num) {
     if (artworks.length) {
       const img = document.createElement('img');
       img.src = artworks[i].src;
+      // 사진 원래 크기를 알게 되면 그 비율로 다시 배치
+      img.addEventListener('load', () => {
+        item.dataset.w = img.naturalWidth;
+        item.dataset.h = img.naturalHeight;
+        layout();
+      });
       item.appendChild(img);
     } else {
       const l1 = 55 + ((i * 37) % 35);
@@ -233,10 +269,16 @@ function closeGallery() {
 function layout() {
   const vh = window.innerHeight;
   const centerY = vh / 2;
-  const sizes = items.map((_, i) => {
+  // 사진 원래 가로세로 비율 그대로. 칸(최대 높이·너비)보다 크면 비율 유지하며 줄이고, 작으면 원래 크기
+  const sizes = items.map((item, i) => {
     const t = Math.max(0, 1 - Math.abs(i - pos)); // 가운데면 1, 한 칸 이상 떨어지면 0
-    const h = vh * (SMALL + (BIG - SMALL) * t);
-    return { w: h * RATIO, h };
+    const maxH = vh * (SMALL + (BIG - SMALL) * t);
+    const maxW = maxH * MAX_WIDE;
+    const nw = Number(item.dataset.w);
+    const nh = Number(item.dataset.h);
+    if (!nw || !nh) return { w: maxH * RATIO, h: maxH };   // 회색 칸, 아직 불러오는 중
+    const scale = Math.min(1, maxW / nw, maxH / nh);
+    return { w: nw * scale, h: nh * scale };
   });
 
   // 왼쪽부터 차례로 놓기
@@ -808,3 +850,272 @@ async function load() {
 Promise.all([load(), loadComments()])
   .then(reorderWindows)
   .finally(() => document.body.classList.add('loaded'));
+
+// ───────── 그림판: 붓 / 지우개 / 물감 채우기 / 색 고르기 / 도형 ─────────
+
+const paint = document.querySelector('.paint');
+const paintCanvas = document.querySelector('.paint-canvas');
+const previewCanvas = document.querySelector('.paint-preview');   // 도형 끌 때 미리보기용
+const pctx = paintCanvas.getContext('2d', { willReadFrequently: true });
+const prev = previewCanvas.getContext('2d');
+const paintStatus = document.querySelector('.paint-status');
+const customColor = document.querySelector('.paint-custom');
+const PW = paintCanvas.width;
+const PH = paintCanvas.height;
+
+const TOOL_NAMES = {
+  brush: '붓', eraser: '지우개', fill: '물감 채우기', picker: '색 고르기 (그림을 누르면 그 색을 가져와요)',
+  line: '직선', rect: '사각형', ellipse: '원',
+};
+// 그림판 기본 색 28개
+const PALETTE = [
+  '#000000', '#808080', '#800000', '#808000', '#008000', '#008080', '#000080',
+  '#800080', '#808040', '#004040', '#0080ff', '#004080', '#8000ff', '#804000',
+  '#ffffff', '#c0c0c0', '#ff0000', '#ffff00', '#00ff00', '#00ffff', '#0000ff',
+  '#ff00ff', '#ffff80', '#00ff80', '#80ffff', '#8080ff', '#ff0080', '#ff8040',
+];
+
+let tool = 'brush';
+let lastTool = 'brush';    // 색 고르기 뒤에 돌아갈 도구
+let color = '#000000';
+let size = 5;
+
+// 흰 도화지로 시작
+pctx.fillStyle = '#fff';
+pctx.fillRect(0, 0, PW, PH);
+
+// 색 팔레트 만들기
+const paletteBox = document.querySelector('.paint-palette');
+PALETTE.forEach((c) => {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.style.background = c;
+  b.title = c;
+  b.addEventListener('click', () => setColor(c));
+  paletteBox.appendChild(b);
+});
+customColor.addEventListener('input', () => setColor(customColor.value));
+
+function setColor(c) {
+  color = c;
+  customColor.value = c;
+}
+
+function setTool(t) {
+  if (t !== 'picker') lastTool = t;
+  tool = t;
+  document.querySelectorAll('.paint-tools [data-tool]').forEach((b) => b.classList.toggle('is-on', b.dataset.tool === t));
+  paintStatus.textContent = TOOL_NAMES[t];
+}
+
+document.querySelectorAll('.paint-tools [data-tool]').forEach((b) => {
+  b.addEventListener('click', () => setTool(b.dataset.tool));
+});
+document.querySelectorAll('.paint-sizes [data-size]').forEach((b) => {
+  b.addEventListener('click', () => {
+    size = Number(b.dataset.size);
+    document.querySelectorAll('.paint-sizes button').forEach((x) => x.classList.toggle('is-on', x === b));
+  });
+});
+
+// ───── 전시관에 올리기: 그린 그림을 골라둔 전시관의 작품(노드)으로 저장 ─────
+const uploadForm = document.querySelector('.paint-upload');
+const uploadBtn = document.querySelector('.paint-upload-btn');
+const hallSelect = document.querySelector('.paint-hall');
+
+uploadBtn.addEventListener('click', () => {
+  if (!halls.length) {
+    alert('먼저 + 버튼으로 전시관을 만들어 주세요.');
+    return;
+  }
+  hallSelect.innerHTML = '';
+  halls.forEach((hall, i) => {
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = `${i + 1} 전시관 · ${hall.name}`;
+    hallSelect.appendChild(opt);
+  });
+  uploadForm.hidden = false;
+  uploadBtn.hidden = true;
+  uploadForm.querySelector('.paint-art-title').focus();
+});
+
+function closeUpload() {
+  uploadForm.hidden = true;
+  uploadBtn.hidden = false;
+}
+document.querySelector('.paint-upload-cancel').addEventListener('click', closeUpload);
+
+uploadForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const num = Number(hallSelect.value) + 1;
+  const hall = halls[num - 1];
+  const goBtn = uploadForm.querySelector('.paint-upload-go');
+  goBtn.disabled = true;
+  paintStatus.textContent = '올리는 중…';
+
+  const blob = await new Promise((resolve) => paintCanvas.toBlob(resolve, 'image/jpeg', 0.9));
+  const path = `${hall.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
+  // 설계하기 방에서는 기존 노드들 오른쪽에 놓이게
+  const nodes = hall.nodes || [];
+  const x = nodes.length ? Math.max(...nodes.map((n) => n.x)) + NODE_WIDTH + 40 : 120;
+  const y = nodes.length ? Math.min(...nodes.map((n) => n.y)) : 120;
+
+  const up = await run(db?.storage.from(BUCKET).upload(path, blob, { contentType: 'image/jpeg' }));
+  const res = up.error ? up : await run(db.from('nodes').insert({
+    hall_id: hall.id,
+    x,
+    y,
+    image_path: path,
+    title: uploadForm.querySelector('.paint-art-title').value.trim(),
+    artist: uploadForm.querySelector('.paint-art-artist').value.trim(),
+  }).select().single());
+  goBtn.disabled = false;
+
+  if (res.error) {
+    paintStatus.textContent = '올리지 못했어요. 다시 해 주세요.';
+    return;
+  }
+  hall.nodes = nodes;
+  nodes.push(rowToNode(res.data));
+  renderWindowArts(num);
+  uploadForm.reset();
+  closeUpload();
+  paintStatus.textContent = `${num} 전시관에 올렸어요!`;
+});
+
+// 닫기: × 또는 Esc. 닫으면 그림판을 처음 상태로 (흰 도화지, 붓, 검정, 보통 굵기)
+function closePaint() {
+  paint.hidden = true;
+  pctx.fillStyle = '#fff';
+  pctx.fillRect(0, 0, PW, PH);
+  prev.clearRect(0, 0, PW, PH);
+  setTool('brush');
+  setColor('#000000');
+  document.querySelector('.paint-sizes [data-size="5"]').click();
+  uploadForm.reset();
+  closeUpload();
+}
+document.querySelector('.paint-close').addEventListener('click', closePaint);
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !paint.hidden) closePaint();
+});
+
+// 화면 좌표 → 도화지 좌표 (도화지가 화면에서 줄어 보여도 정확하게)
+function canvasPoint(e) {
+  const r = previewCanvas.getBoundingClientRect();
+  return {
+    x: Math.round((e.clientX - r.left) * PW / r.width),
+    y: Math.round((e.clientY - r.top) * PH / r.height),
+  };
+}
+
+function drawShape(ctx, kind, a, b) {
+  ctx.strokeStyle = color;
+  ctx.lineWidth = size;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  if (kind === 'line') {
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+  } else if (kind === 'rect') {
+    ctx.rect(a.x, a.y, b.x - a.x, b.y - a.y);
+  } else {
+    ctx.ellipse((a.x + b.x) / 2, (a.y + b.y) / 2, Math.abs(b.x - a.x) / 2, Math.abs(b.y - a.y) / 2, 0, 0, Math.PI * 2);
+  }
+  ctx.stroke();
+}
+
+let start = null;   // 누른 지점
+let last = null;    // 붓·지우개 직전 지점
+
+previewCanvas.addEventListener('pointerdown', (e) => {
+  previewCanvas.setPointerCapture(e.pointerId);
+  const p = canvasPoint(e);
+
+  if (tool === 'picker') {                       // 색 고르기: 누른 곳 색 가져오고 원래 도구로
+    const [r, g, b] = pctx.getImageData(p.x, p.y, 1, 1).data;
+    setColor('#' + [r, g, b].map((v) => v.toString(16).padStart(2, '0')).join(''));
+    setTool(lastTool);
+    return;
+  }
+  if (tool === 'fill') {
+    floodFill(p.x, p.y, color);
+    return;
+  }
+  start = last = p;
+  if (tool === 'brush' || tool === 'eraser') strokeTo(p);   // 콕 찍어도 점이 찍히게
+});
+
+previewCanvas.addEventListener('pointermove', (e) => {
+  if (!start) return;
+  const p = canvasPoint(e);
+  if (tool === 'brush' || tool === 'eraser') {
+    strokeTo(p);
+  } else {
+    prev.clearRect(0, 0, PW, PH);
+    drawShape(prev, tool, start, p);
+  }
+});
+
+previewCanvas.addEventListener('pointerup', (e) => {
+  if (!start) return;
+  if (tool === 'line' || tool === 'rect' || tool === 'ellipse') {
+    prev.clearRect(0, 0, PW, PH);
+    drawShape(pctx, tool, start, canvasPoint(e));
+  }
+  start = last = null;
+});
+
+// 붓·지우개: 직전 지점에서 지금 지점까지 선 (지우개 = 흰색으로 굵게)
+function strokeTo(p) {
+  const eraser = tool === 'eraser';
+  pctx.strokeStyle = eraser ? '#fff' : color;
+  pctx.lineWidth = eraser ? size * 3 : size;
+  pctx.lineCap = eraser ? 'square' : 'round';
+  pctx.lineJoin = 'round';
+  pctx.beginPath();
+  pctx.moveTo(last.x, last.y);
+  pctx.lineTo(p.x, p.y);
+  pctx.stroke();
+  last = p;
+}
+
+// 물감 채우기: 누른 곳과 비슷한 색으로 이어진 영역을 한 번에 칠하기
+function floodFill(x, y, hex) {
+  const img = pctx.getImageData(0, 0, PW, PH);
+  const d = img.data;
+  const nr = parseInt(hex.slice(1, 3), 16);
+  const ng = parseInt(hex.slice(3, 5), 16);
+  const nb = parseInt(hex.slice(5, 7), 16);
+  const i0 = (y * PW + x) * 4;
+  const [tr, tg, tb] = [d[i0], d[i0 + 1], d[i0 + 2]];
+  if (tr === nr && tg === ng && tb === nb) return;
+
+  // 선 가장자리의 흐릿한 픽셀까지 어느 정도 같은 색으로 봄 (빈틈 없이 칠해지게)
+  const same = (p) => {
+    const i = p * 4;
+    return Math.abs(d[i] - tr) + Math.abs(d[i + 1] - tg) + Math.abs(d[i + 2] - tb) <= 120;
+  };
+  const seen = new Uint8Array(PW * PH);
+  const stack = [y * PW + x];
+  while (stack.length) {
+    const p = stack.pop();
+    if (seen[p] || !same(p)) continue;
+    // 가로로 왼쪽·오른쪽 끝까지 한 줄 칠하고, 위아래 줄은 나중에
+    const row = Math.floor(p / PW);
+    let l = p;
+    let r = p;
+    while (l % PW > 0 && !seen[l - 1] && same(l - 1)) l--;
+    while (r % PW < PW - 1 && !seen[r + 1] && same(r + 1)) r++;
+    for (let q = l; q <= r; q++) {
+      seen[q] = 1;
+      const i = q * 4;
+      d[i] = nr; d[i + 1] = ng; d[i + 2] = nb; d[i + 3] = 255;
+      if (row > 0 && !seen[q - PW]) stack.push(q - PW);
+      if (row < PH - 1 && !seen[q + PW]) stack.push(q + PW);
+    }
+  }
+  pctx.putImageData(img, 0, 0);
+}

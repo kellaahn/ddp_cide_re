@@ -12,6 +12,31 @@ html, body{
 body{
   display: flex;
   flex-direction: column;
+  font-family: "Noto Sans KR", sans-serif;   /* 사이트 모든 글자: 노토 산스 KR */
+  font-optical-sizing: auto;
+}
+/* 버튼·입력칸은 기본으로 글꼴을 물려받지 않아서 따로 */
+button, input, textarea{
+  font-family: inherit;
+}
+
+/* 처음 들어오면 2초 동안 보이는 첫 화면 (art.jpg) */
+.splash{
+  position: fixed;
+  inset: 0;
+  z-index: 100;            /* 모든 것 위에 */
+  background: #fff;
+  transition: opacity 0.6s;   /* 사라질 때 부드럽게 */
+}
+.splash img{
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;     /* 그림 비율 그대로, 화면 안에 꽉 차게 */
+}
+.splash.is-gone{
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* 맨 위 줄: 제목은 화면 가운데, + 버튼은 왼쪽 */
@@ -22,26 +47,45 @@ body{
   justify-content: center;
   padding: 24px 24px 28px;
 }
-.add-btn{
+/* 왼쪽 버튼 두 개: 위아래로 쌓아서, 묶음 전체를 제목 높이 가운데에 */
+.tool-btns{
+  position: absolute;
+  top: 50%;
+  left: 24px;    /* 화면 왼쪽에서 거리 */
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;      /* 두 버튼 사이 간격 */
+}
+.add-btn,
+.brush-btn{
   width: 36px;
   height: 36px;
   border: 1px solid #000;
   background: #fff;
-  font-size: 24px;
   line-height: 1;
   cursor: pointer;
-
-  position: absolute;
-  top: 50%;
-  left: 24px;    /* 화면 왼쪽에서 거리 */
-  transform: translateY(-50%);  /* 제목 높이의 가운데에 맞춤 */
 }
-.add-btn:hover{
+.add-btn{
+  font-size: 24px;
+}
+.brush-btn{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.brush-btn svg{
+  width: 20px;            /* 붓 아이콘 크기 */
+  height: 20px;
+  fill: currentColor;     /* 버튼 글자색을 따라서 hover 때 흰색 */
+}
+.add-btn:hover,
+.brush-btn:hover{
   background: #000;
   color: #fff;
 }
 .title{
-  font-family: "agahnsangsoo2012", sans-serif;
+  font-family: "Noto Sans KR", sans-serif;
   font-weight: 300;
   font-style: normal;
   font-size: clamp(56px, 7vw, 100px); /* 화면 폭에 맞춰 56~100px */
@@ -50,23 +94,41 @@ body{
   white-space: nowrap;
   text-align: center;
 }
+/* 일러스트레이터 로고 (logo.svg): 높이만 정하면 가로는 비율대로 */
+.title-logo{
+  display: block;
+  height: clamp(48px, 6.5vw, 92px);  /* 화면 폭에 맞춰 48~92px */
+  width: auto;
+}
 
-/* 창들: 남은 높이를 다 쓰고, 개수만큼 가로를 똑같이 나눔 */
+/* 창들: 남은 높이를 다 쓰고, 가로는 똑같이 나눔. 한 줄에 10칸까지, 넘치면 아랫줄로 */
 .windows{
   flex: 1;
   min-height: 0;
-  display: flex;
+  display: grid;
+  grid-auto-flow: column;         /* 10개 미만: 한 줄에 개수만큼 나눔 */
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-rows: 100%;           /* 한 줄 높이 = 화면에 보이는 높이 */
+  overflow-y: auto;               /* 줄이 늘어나면 아래로 스크롤 */
   border-top: 1px solid #000;
 }
+.windows:has(> .window:nth-child(10)){
+  grid-auto-flow: row;            /* 10개 이상: 한 줄에 10칸씩 */
+  grid-template-columns: repeat(10, minmax(0, 1fr));   /* 한 줄에 들어갈 칸 수 */
+}
 .window{
-  flex: 1 1 0;
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   border-right: 1px solid #000;
 }
-.window:last-child{
+.windows:not(:has(> .window:nth-child(10))) > .window:last-child,
+.window:nth-child(10n){
   border-right: none;
+}
+.window:nth-child(n+11){
+  border-top: 1px solid #000;     /* 아랫줄 칸 위에 선 */
 }
 /* 창 맨 위 줄: [전시관 N  입장 →] [×] */
 .window-head{
@@ -76,7 +138,7 @@ body{
 }
 .window-del{
   flex: none;
-  width: 30px;
+  width: 26px;
   border: none;
   border-left: 1px solid #000;
   background: #fff;
@@ -92,18 +154,43 @@ body{
   flex: 1;
   display: flex;
   justify-content: space-between;
+  align-items: center;            /* 숫자·전시관을 세로 가운데로 */
   min-width: 0;
-  padding: 6px 12px;
+  padding: 12px 8px;              /* 위아래 여백 (같게) */
+  overflow: hidden;
   border: none;
   background: #fff;
   color: #000;
   font: inherit;
-  font-size: 12px;
-  letter-spacing: 0.05em;
   text-align: left;
   cursor: pointer;
+  container-type: inline-size;   /* 창이 좁아지면 '입장 →'을 숨기려고 */
 }
-.window-bar span{
+/* [큰 숫자][전·시·관 세로] — 아랫선 맞춤 */
+.bar-name{
+  position: relative;
+  top: calc(var(--num) * -0.066); /* 숫자 글자 모양이 아래로 치우친 만큼 올려서 눈으로 보기에 가운데 */
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;                       /* 숫자와 '전시관' 사이 간격 */
+  --num: 56px;                    /* 숫자 크기: 이것만 바꾸면 '전시관'도 같이 맞춰짐 */
+}
+.bar-num{
+  font-size: var(--num);
+  line-height: 0.74;
+  letter-spacing: -0.04em;
+}
+.bar-label{
+  writing-mode: vertical-rl;      /* 세로쓰기 */
+  text-orientation: upright;      /* 글자는 똑바로 세워서 */
+  font-size: calc(var(--num) * 0.25);       /* 세로 '전시관' 높이 = 숫자 높이 */
+  margin-bottom: calc(var(--num) * -0.08);    /* 숫자 아랫선과 딱 맞추기 */
+  line-height: 1;
+  letter-spacing: 0.04em;         /* 세로 글자 사이 간격 */
+}
+.bar-enter{
+  font-size: 12px;
+  letter-spacing: 0.05em;
   opacity: 0;
   transition: opacity 0.2s;
 }
@@ -111,14 +198,21 @@ body{
   background: #000;
   color: #fff;
 }
-.window-bar:hover span{
+.window-bar:hover .bar-enter{
   opacity: 1;
+}
+@container (max-width: 110px){
+  .bar-enter{ display: none; }    /* 좁은 창에선 숫자·전시관만 */
+}
+@container (max-width: 60px){     /* 아주 좁은 창: 숫자와 '전시관' 사이만 좁게 */
+  .bar-name{ gap: 2px; }
 }
 /* 창마다 스크롤 하나씩 */
 .window-body{
   flex: 1;
   min-height: 0;
   overflow-y: scroll;
+  overflow-x: hidden;   /* 옆으로는 스크롤 안 생기게 */
   padding: 16px;
 }
 /* Firefox용 (Chrome은 이 속성이 있으면 아래 꾸민 스크롤바를 무시해서 따로 분리) */
@@ -160,7 +254,7 @@ body.loaded .windows:empty + .intro{
   align-items: center;
   border-top: 1px solid #000;
   padding: 24px;
-  font-family: "Gowun Batang", serif;
+  font-family: "Noto Sans KR", sans-serif;
   font-size: 16px;
   line-height: 2;           /* 줄 사이 간격 */
   letter-spacing: -0.01em;  /* 글자 사이 간격 */
@@ -210,7 +304,7 @@ body.loaded .windows:empty + .intro{
 
 /* 입력 폼 */
 .form-number{
-  font-family: "agahnsangsoo2012", sans-serif;
+  font-family: "Noto Sans KR", sans-serif;
   font-size: 32px;
   line-height: 1;
 }
@@ -227,7 +321,7 @@ body.loaded .windows:empty + .intro{
   padding: 8px 10px;
   border: 1px solid #000;
   border-radius: 0;
-  font-family: "Gowun Batang", serif;
+  font-family: "Noto Sans KR", sans-serif;
   font-size: 15px;
   outline: none;
 }
@@ -255,8 +349,8 @@ body.loaded .windows:empty + .intro{
 
 /* 만들어진 전시관 창 안의 글 */
 .hall-name{
-  font-family: "agahnsangsoo2012", sans-serif;
-  font-weight: 300;
+  font-family: "Noto Sans KR", sans-serif;
+  font-weight: 400;
   font-size: 28px;
   line-height: 1.1;
   word-break: keep-all;
@@ -266,16 +360,33 @@ body.loaded .windows:empty + .intro{
   font-size: 12px;
   letter-spacing: 0.05em;
 }
+/* 전시 주제·설명: 평소엔 접혀 있다가 그 전시관 칸에 마우스를 올리면 펼쳐짐 */
+.hall-more{
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows 0.3s ease, opacity 0.3s ease;
+}
+.hall-more > div{
+  overflow: hidden;
+}
+.window:hover .hall-more{
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+/* 글자는 만든이(.hall-maker)와 같은 크기·굵기·자간 */
+.hall-theme,
+.hall-desc{
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.05em;
+}
 .hall-theme{
-  margin-top: 20px;
-  font-family: "Gowun Batang", serif;
-  font-size: 16px;
+  margin-top: 12px;
   word-break: keep-all;
 }
 .hall-desc{
-  margin-top: 12px;
-  font-family: "Gowun Batang", serif;
-  font-size: 14px;
+  margin-top: 6px;
   line-height: 1.7;
   white-space: pre-wrap;     /* 설명에서 엔터 친 줄바꿈 그대로 */
   word-break: keep-all;
@@ -301,6 +412,17 @@ body.loaded .windows:empty + .intro{
 }
 .gallery.is-open{
   opacity: 1;
+}
+/* 전시장 배경의 art.jpg: 글이 잘 읽히게 거의 투명하게 */
+.gallery::before{
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;                      /* 작품·글 뒤에 */
+  background: url("art.jpg") center / contain no-repeat;
+  mix-blend-mode: multiply;         /* 그림의 흰 바탕은 안 보이게 */
+  opacity: 0.08;                    /* 투명도 (0 = 안 보임, 1 = 진하게) */
+  pointer-events: none;
 }
 
 /* 위·아래 작은 글씨 줄 */
@@ -374,7 +496,7 @@ body.loaded .windows:empty + .intro{
 .art-item img{
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;   /* 사진을 자르지 않고 전체 그대로 */
   display: block;
 }
 
@@ -618,7 +740,7 @@ textarea.node-field{
 }
 .win-art-note{
   margin-top: 10px;
-  font-family: "Gowun Batang", serif;
+  font-family: "Noto Sans KR", sans-serif;
   font-size: 13px;
   line-height: 1.7;
   white-space: pre-wrap;
@@ -680,7 +802,7 @@ textarea.node-field{
   width: max-content;       /* 작품 바깥 오른쪽에서도 한 줄로 (260px 넘으면 줄바꿈) */
   min-width: 2px;
   max-width: 260px;
-  font-family: "Gowun Batang", serif;
+  font-family: "Noto Sans KR", sans-serif;
   font-size: 14px;
   line-height: 1.5;
   letter-spacing: 0;
@@ -697,4 +819,248 @@ textarea.node-field{
   pointer-events: none;
   user-select: none;
   cursor: inherit;
+}
+
+/* ───────── 그림판 (🖌️ 붓 버튼): 사이트와 같은 흰 바탕 + 검은 선 ───────── */
+.paint{
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.7);   /* + 창과 같은 뒤 배경 */
+}
+.paint[hidden]{
+  display: none;
+}
+.paint-window{
+  display: flex;
+  flex-direction: column;
+  width: min(980px, 100%);
+  max-height: 100%;
+  border: 1px solid #000;
+  background: #fff;
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  overflow: hidden;
+}
+.paint-title{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0 0 16px;
+  border-bottom: 1px solid #000;
+  font-size: 14px;
+}
+.paint-close{
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-left: 1px solid #000;
+  background: none;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+.paint-close:hover{
+  background: #000;
+  color: #fff;
+}
+.paint-body{
+  display: flex;
+  min-height: 0;
+}
+
+/* 왼쪽 도구: 글자 버튼 세로 목록 */
+.paint-tools{
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  width: 96px;
+  border-right: 1px solid #000;
+}
+.paint-tools [data-tool]{
+  padding: 9px 12px;
+  border: none;
+  border-bottom: 1px solid #000;
+  background: #fff;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.paint-tools [data-tool]:hover{
+  background: rgba(17, 17, 17, 0.08);
+}
+.paint-tools [data-tool].is-on{
+  background: #000;              /* 고른 도구는 검정 */
+  color: #fff;
+}
+/* 굵기 고르기 */
+.paint-sizes{
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+}
+.paint-sizes button{
+  display: flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  background: none;
+  cursor: pointer;
+}
+.paint-sizes i{
+  flex: 1;
+  background: #000;
+}
+.paint-sizes button:hover{
+  border-color: #000;
+}
+.paint-sizes button.is-on{
+  background: #000;
+}
+.paint-sizes button.is-on i{
+  background: #fff;
+}
+
+/* 도화지 (미리보기 캔버스를 위에 겹침) */
+.paint-canvas-wrap{
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  align-self: flex-start;
+  background: #fff;
+}
+.paint-canvas,
+.paint-preview{
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.paint-preview{
+  position: absolute;
+  inset: 0;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+/* 아래: 지금 색 + 색 팔레트 */
+.paint-bottom{
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-top: 1px solid #000;
+}
+.paint-current{
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border: 1px solid #000;
+  cursor: pointer;
+}
+.paint-current input{
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  cursor: pointer;
+}
+.paint-current input::-webkit-color-swatch-wrapper{ padding: 0; }
+.paint-current input::-webkit-color-swatch{ border: none; }
+.paint-palette{
+  display: grid;
+  grid-template-columns: repeat(14, 16px);
+  grid-auto-rows: 16px;
+  gap: 0;
+  border-top: 1px solid #000;
+  border-left: 1px solid #000;
+}
+.paint-palette button{
+  border: none;
+  border-right: 1px solid #000;
+  border-bottom: 1px solid #000;
+  cursor: pointer;
+}
+.paint-palette button:hover{
+  outline: 2px solid #000;
+  outline-offset: -4px;
+}
+/* 맨 아래 줄: 왼쪽 도구 이름, 오른쪽 끝 '전시관에 올리기' */
+.paint-foot{
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  border-top: 1px solid #000;
+}
+.paint-status{
+  align-self: center;
+  padding: 6px 16px;
+}
+.paint-upload-btn,
+.paint-upload-go{
+  padding: 10px 20px;
+  border: none;
+  border-left: 1px solid #000;
+  background: #000;
+  color: #fff;
+  font-size: 13px;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+}
+.paint-upload-btn:hover,
+.paint-upload-go:hover{
+  background: #fff;
+  color: #000;
+}
+.paint-upload-btn:disabled{
+  background: #fff;
+  color: #999;
+  cursor: default;
+}
+/* 올릴 전시관·제목·작가 고르는 줄 */
+.paint-upload{
+  display: flex;
+  border-top: 1px solid #000;
+}
+.paint-upload[hidden]{
+  display: none;
+}
+.paint-upload select,
+.paint-upload input{
+  min-width: 0;
+  padding: 8px 12px;
+  border: none;
+  border-right: 1px solid #000;
+  border-radius: 0;
+  background: #fff;
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+.paint-upload select{ flex: 1.2; }
+.paint-upload input{ flex: 1; }
+.paint-upload input:focus,
+.paint-upload select:focus{
+  box-shadow: inset 0 0 0 1px #000;
+}
+.paint-upload-go{
+  border-left: none;
+}
+.paint-upload-cancel{
+  padding: 0 16px;
+  border: none;
+  border-left: 1px solid #000;
+  background: #fff;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.paint-upload-cancel:hover{
+  background: rgba(17, 17, 17, 0.08);
 }
