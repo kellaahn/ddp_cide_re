@@ -881,7 +881,8 @@ textarea.node-field{
   width: 96px;
   border-right: 1px solid #000;
 }
-.paint-tools [data-tool]{
+.paint-tools [data-tool],
+.paint-undo{
   padding: 9px 12px;
   border: none;
   border-bottom: 1px solid #000;
@@ -890,8 +891,13 @@ textarea.node-field{
   text-align: left;
   cursor: pointer;
 }
-.paint-tools [data-tool]:hover{
+.paint-tools [data-tool]:hover,
+.paint-undo:not(:disabled):hover{
   background: rgba(17, 17, 17, 0.08);
+}
+.paint-undo:disabled{
+  color: #bbb;                   /* 되돌릴 게 없을 때 흐리게 */
+  cursor: default;
 }
 .paint-tools [data-tool].is-on{
   background: #000;              /* 고른 도구는 검정 */

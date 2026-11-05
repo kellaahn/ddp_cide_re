@@ -1001,6 +1001,8 @@ function closePaint() {
   pctx.fillStyle = '#fff';
   pctx.fillRect(0, 0, PW, PH);
   prev.clearRect(0, 0, PW, PH);
+  undoStack.length = 0;
+  undoBtn.disabled = true;
   setTool('brush');
   setColor('#000000');
   document.querySelector('.paint-sizes [data-size="5"]').click();
@@ -1041,9 +1043,34 @@ function drawShape(ctx, kind, a, b) {
 let start = null;   // 누른 지점
 let last = null;    // 붓·지우개 직전 지점
 
+// 되돌리기: 그리기 직전 그림을 저장해 두었다가 하나씩 꺼냄 (최대 30번)
+const UNDO_MAX = 30;
+const undoStack = [];
+const undoBtn = document.querySelector('.paint-undo');
+
+function saveUndo() {
+  undoStack.push(pctx.getImageData(0, 0, PW, PH));
+  if (undoStack.length > UNDO_MAX) undoStack.shift();
+  undoBtn.disabled = false;
+}
+function undo() {
+  if (!undoStack.length || start) return;   // 그리는 도중엔 무시
+  pctx.putImageData(undoStack.pop(), 0, 0);
+  undoBtn.disabled = !undoStack.length;
+}
+undoBtn.addEventListener('click', undo);
+document.addEventListener('keydown', (e) => {
+  if (paint.hidden || e.target.matches('input, select, textarea')) return;
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+    e.preventDefault();
+    undo();
+  }
+});
+
 previewCanvas.addEventListener('pointerdown', (e) => {
   previewCanvas.setPointerCapture(e.pointerId);
   const p = canvasPoint(e);
+  if (tool !== 'picker') saveUndo();             // 색 고르기 말고는 그리기 전 상태 저장
 
   if (tool === 'picker') {                       // 색 고르기: 누른 곳 색 가져오고 원래 도구로
     const [r, g, b] = pctx.getImageData(p.x, p.y, 1, 1).data;
