@@ -151,6 +151,17 @@ function hallCommentCount(hall) {
     (sum, node) => sum + (comments.get(node.id) || []).filter((c) => c.text).length, 0);
 }
 
+// 전시관 안 작품 순서: 댓글 많은 작품이 앞으로 (같으면 설계하기 방에서 연결한 순서대로)
+function artCommentCount(node) {
+  return (comments.get(node.id) || []).filter((c) => c.text).length;
+}
+function galleryOrder(hall) {
+  return exhibitOrder(hall)
+    .map((node, i) => ({ node, i, n: artCommentCount(node) }))
+    .sort((a, b) => b.n - a.n || a.i - b.i)
+    .map((x) => x.node);
+}
+
 function reorderWindows() {
   const sorted = [...halls].sort((a, b) =>
     hallCommentCount(b) - hallCommentCount(a) || a.id - b.id);
@@ -174,11 +185,11 @@ async function deleteHall(hall) {
   rest.forEach(addWindow);
 }
 
-// 메인 창 안, 전시관 설명 밑에 작품들 (전시 순서대로: 제목, 작가, 이미지, 해석)
+// 메인 창 안, 전시관 설명 밑에 작품들 (전시 화면과 같은 순서: 제목, 작가, 이미지, 해석)
 function renderWindowArts(num) {
   const box = windows.children[num - 1].querySelector('.win-arts');
   box.innerHTML = '';
-  exhibitOrder(halls[num - 1]).forEach((art, i) => {
+  galleryOrder(halls[num - 1]).forEach((art, i) => {
     const el = document.createElement('article');
     el.className = 'win-art';
     el.innerHTML = `
@@ -221,7 +232,7 @@ function openGallery(num) {
   gallery.querySelector('.g-desc').textContent = hall.desc;
 
   // 작품 칸 만들기: 설계 방에 올린 사진이 있으면 그 사진들, 없으면 회색 빈 칸
-  artworks = exhibitOrder(hall);
+  artworks = galleryOrder(hall);   // 들어올 때마다 그때의 댓글 수로 순서 정함
   const count = artworks.length || ART_COUNT;
   hallName = hall.name;
   track.innerHTML = '';
