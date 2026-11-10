@@ -1175,9 +1175,12 @@ textarea.node-field{
   .g-desc{
     max-width: 55%;
   }
-  .gallery-track{                 /* 양쪽 흐림을 좁게 */
-    -webkit-mask-image: linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent);
-            mask-image: linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent);
+  .gallery-track{                 /* 작품이 위아래로 쌓이니 위·아래 끝을 흐리게 (버튼·설명 글자 밑) */
+    -webkit-mask-image: linear-gradient(180deg, transparent 6%, #000 18%, #000 82%, transparent 94%);
+            mask-image: linear-gradient(180deg, transparent 6%, #000 18%, #000 82%, transparent 94%);
+  }
+  .gallery-note{
+    max-height: 96px;             /* 작품 사이 간격 안에 들어가게 */
   }
   .gallery-caption{
     max-width: 70vw;

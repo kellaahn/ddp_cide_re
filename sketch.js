@@ -215,6 +215,13 @@ const BIG = 0.56;          // 가운데 작품 최대 높이 (화면 높이 대�
 const MAX_WIDE = 1.6;      // 최대 너비 = 최대 높이 × 이 값 (가로로 긴 사진이 너무 넓어지지 않게)
 const RATIO = 3 / 4;       // 사진 없는 회색 칸·사진 불러오는 중의 가로:세로
 const GAP = 48;            // 작품 사이 간격(px)
+// 휴대폰(작품이 위아래로 쌓일 때)
+const M_SMALL = 0.5;       // 위아래 작품 최대 너비 (화면 폭 대비)
+const M_BIG = 0.84;        // 가운데 작품 최대 너비 (화면 폭 대비)
+const M_GAP = 120;         // 작품 사이 간격(px): 제목·해석이 들어갈 자리
+function isVertical() {
+  return window.innerWidth <= 700;   // style.css의 휴대폰 기준과 같게
+}
 
 let items = [];            // 작품 칸 요소들
 let pos = 0;               // 지금 가운데에 있는 위치 (소수 = 넘어가는 중)
@@ -278,52 +285,67 @@ function closeGallery() {
 
 // 작품 크기·위치 계산: 가운데에 가까울수록 크게
 function layout() {
+  const vw = window.innerWidth;
   const vh = window.innerHeight;
-  const centerY = vh / 2;
+  const vert = isVertical();   // 휴대폰: 작품이 위아래로 쌓임
   // 사진 원래 가로세로 비율 그대로. 칸(최대 높이·너비)보다 크면 비율 유지하며 줄이고, 작으면 원래 크기
   const sizes = items.map((item, i) => {
     const t = Math.max(0, 1 - Math.abs(i - pos)); // 가운데면 1, 한 칸 이상 떨어지면 0
-    const maxH = vh * (SMALL + (BIG - SMALL) * t);
-    const maxW = Math.min(maxH * MAX_WIDE, window.innerWidth * 0.8);   // 휴대폰처럼 좁은 화면에선 화면 폭의 80%까지
+    let maxH;
+    let maxW;
+    if (vert) {
+      maxW = vw * (M_SMALL + (M_BIG - M_SMALL) * t);     // 휴대폰: 화면 폭 기준
+      maxH = vh * 0.5 * (M_SMALL + (M_BIG - M_SMALL) * t) / M_BIG;
+    } else {
+      maxH = vh * (SMALL + (BIG - SMALL) * t);
+      maxW = Math.min(maxH * MAX_WIDE, vw * 0.8);
+    }
     const nw = Number(item.dataset.w);
     const nh = Number(item.dataset.h);
-    if (!nw || !nh) return { w: maxH * RATIO, h: maxH };   // 회색 칸, 아직 불러오는 중
+    if (!nw || !nh) return { w: Math.min(maxW, maxH * RATIO), h: Math.min(maxH, maxW / RATIO) };   // 회색 칸, 아직 불러오는 중
     const scale = Math.min(1, maxW / nw, maxH / nh);
     return { w: nw * scale, h: nh * scale };
   });
 
-  // 왼쪽부터 차례로 놓기
-  const xs = [];
-  let x = 0;
-  sizes.forEach((s) => { xs.push(x); x += s.w + GAP; });
+  // 차례로 놓기: 노트북은 왼쪽부터 옆으로, 휴대폰은 위에서부터 아래로
+  const gap = vert ? M_GAP : GAP;
+  const along = sizes.map((sz) => (vert ? sz.h : sz.w));
+  const starts = [];
+  let run = 0;
+  along.forEach((len) => { starts.push(run); run += len + gap; });
 
   // pos 위치의 작품이 화면 가운데 오도록 전체를 밀기
   const a = Math.floor(pos);
   const b = Math.min(a + 1, items.length - 1);
-  const ca = xs[a] + sizes[a].w / 2;
-  const cb = xs[b] + sizes[b].w / 2;
-  const offset = window.innerWidth / 2 - (ca + (cb - ca) * (pos - a));
+  const ca = starts[a] + along[a] / 2;
+  const cb = starts[b] + along[b] / 2;
+  const offset = (vert ? vh : vw) / 2 - (ca + (cb - ca) * (pos - a));
+
+  // 각 작품의 왼쪽 위 좌표
+  const boxes = sizes.map((sz, i) => (vert
+    ? { x: (vw - sz.w) / 2, y: starts[i] + offset, ...sz }
+    : { x: starts[i] + offset, y: vh / 2 - sz.h / 2, ...sz }));
 
   const active = Math.round(pos);
   items.forEach((item, i) => {
-    const s = sizes[i];
-    item.style.width = s.w + 'px';
-    item.style.height = s.h + 'px';
-    item.style.transform = `translate(${xs[i] + offset}px, ${centerY - s.h / 2}px)`;
+    const bx = boxes[i];
+    item.style.width = bx.w + 'px';
+    item.style.height = bx.h + 'px';
+    item.style.transform = `translate(${bx.x}px, ${bx.y}px)`;
     item.classList.toggle('is-active', i === active);   // 댓글 모드에서 이 작품만 또렷하게
   });
 
   // 가운데 작품 왼쪽 위에 번호 + 제목
-  const s = sizes[active];
+  const s = boxes[active];
   const art = artworks[active];
   caption.querySelector('.cap-num').textContent = `(${String(active + 1).padStart(2, '0')})`;
   caption.querySelector('.cap-title').textContent = art ? (art.title || '무제') : hallName;
   caption.querySelector('.cap-artist').textContent = art ? art.artist : '';
-  caption.style.transform = `translate(${xs[active] + offset}px, ${centerY - s.h / 2 - 12}px) translateY(-100%)`;
+  caption.style.transform = `translate(${s.x}px, ${s.y - 12}px) translateY(-100%)`;
 
   // 가운데 작품 아래에 해석
   note.textContent = art ? art.note : '';
-  note.style.transform = `translate(${xs[active] + offset}px, ${centerY + s.h / 2 + 12}px)`;
+  note.style.transform = `translate(${s.x}px, ${s.y + s.h + 12}px)`;
   note.style.width = s.w + 'px';
 
   const fade = Math.max(0, 1 - Math.abs(pos - active) * 4);
@@ -331,7 +353,7 @@ function layout() {
   note.style.opacity = fade;
 
   // 댓글 층: 가운데 작품에 딱 겹치게. 가운데 작품이 바뀌면 그 작품에 쓴 글만 보이게
-  commentLayer.style.transform = `translate(${xs[active] + offset}px, ${centerY - s.h / 2}px)`;
+  commentLayer.style.transform = `translate(${s.x}px, ${s.y}px)`;
   commentLayer.style.width = s.w + 'px';
   commentLayer.style.height = s.h + 'px';
   commentLayer.style.opacity = fade;
@@ -368,7 +390,7 @@ gallery.addEventListener('wheel', (e) => {
   snapTimer = setTimeout(() => goTo(Math.round(target)), 150);
 }, { passive: false });
 
-// 휴대폰: 손가락으로 좌우로 밀면 작품이 넘어감
+// 손가락으로 밀면 작품이 넘어감 (노트북 화면은 좌우, 휴대폰은 위아래)
 let touchX = null;
 let touchY = 0;
 let touchBase = 0;
@@ -382,16 +404,19 @@ gallery.addEventListener('touchstart', (e) => {
 }, { passive: true });
 gallery.addEventListener('touchmove', (e) => {
   if (touchX === null) return;
-  const dx = e.touches[0].clientX - touchX;
-  const dy = e.touches[0].clientY - touchY;
+  let dx = e.touches[0].clientX - touchX;
+  let dy = e.touches[0].clientY - touchY;
+  if (isVertical()) [dx, dy] = [dy, dx];   // 휴대폰은 위아래로 밀기
   if (!swiping && Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) swiping = true;
   if (!swiping) return;
   e.preventDefault();
-  goTo(touchBase - dx / (window.innerWidth * 0.5));   // 손가락을 따라 움직이기
+  goTo(touchBase - dx / ((isVertical() ? window.innerHeight : window.innerWidth) * 0.5));   // 손가락을 따라 움직이기
 }, { passive: false });
 gallery.addEventListener('touchend', (e) => {
   if (touchX === null) return;
-  const dx = e.changedTouches[0].clientX - touchX;
+  const dx = isVertical()
+    ? e.changedTouches[0].clientY - touchY
+    : e.changedTouches[0].clientX - touchX;
   touchX = null;
   if (!swiping) return;
   // 조금만 밀어도 한 작품씩 넘어가게
@@ -408,8 +433,8 @@ document.addEventListener('keydown', (e) => {
     if (gallery.classList.contains('comment-mode')) setCommentMode(false);   // 댓글 모드면 모드만 끄기
     else closeGallery();
   }
-  if (e.key === 'ArrowRight') goTo(Math.round(target) + 1);
-  if (e.key === 'ArrowLeft') goTo(Math.round(target) - 1);
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') goTo(Math.round(target) + 1);
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') goTo(Math.round(target) - 1);
 });
 
 window.addEventListener('resize', () => { if (!gallery.hidden) layout(); });
