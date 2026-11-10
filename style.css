@@ -1070,3 +1070,214 @@ textarea.node-field{
 .paint-upload-cancel:hover{
   background: rgba(17, 17, 17, 0.08);
 }
+
+/* 설계하기 방의 휴대폰 안내 문구: 컴퓨터에선 숨김 */
+.design-mobile-note{
+  display: none;
+}
+
+/* ═════════ 휴대폰 (화면 폭 700px 이하): 컴퓨터 화면은 위 그대로, 여기서만 바뀜 ═════════ */
+@media (max-width: 700px){
+
+  /* 맨 위: 로고와 버튼 조금 작게 */
+  .top{
+    padding: 16px 16px 18px;
+  }
+  .tool-btns{
+    left: 16px;
+  }
+  .add-btn,
+  .brush-btn{
+    width: 32px;
+    height: 32px;
+  }
+  .title-logo{
+    height: 40px;
+  }
+
+  /* 메인: 한 줄에 2칸, 아래로 스크롤 */
+  .windows,
+  .windows:has(> .window:nth-child(10)){
+    grid-auto-flow: row;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: 72svh;        /* 칸 높이 = 화면 높이의 72% */
+  }
+  .windows .window{
+    border-right: 1px solid #000 !important;
+    border-top: none !important;
+  }
+  .windows .window:nth-child(2n){
+    border-right: none !important;
+  }
+  .windows .window:nth-child(n+3){
+    border-top: 1px solid #000 !important;
+  }
+  .bar-name{
+    --num: 44px;                  /* 휴대폰에서 숫자 크기 */
+  }
+  .window-bar{
+    padding: 10px 8px;
+  }
+  .window-del{
+    width: 36px;                  /* 손가락으로 누르기 쉽게 */
+  }
+  .window-body{
+    padding: 14px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .window-body::-webkit-scrollbar{
+    width: 0;                     /* 휴대폰은 스크롤바 숨김 */
+  }
+  .win-info{
+    top: -14px;
+    margin: -14px -14px 0;
+    padding: 14px 14px 16px;
+  }
+  .hall-name{
+    font-size: 20px;
+  }
+  /* 휴대폰엔 '마우스 올리기'가 없어서 주제·설명을 처음부터 펼쳐 둠 */
+  .hall-more{
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+  .win-art-title{
+    font-size: 13px;
+  }
+  .win-art-note{
+    font-size: 12px;
+  }
+  body.loaded .windows:empty + .intro{
+    font-size: 14px;
+  }
+
+  /* 전시관 안: 버튼·글씨 휴대폰에 맞게 */
+  .gallery{
+    font-size: 12px;
+  }
+  .gallery-top{
+    padding: 12px;
+    gap: 6px;
+  }
+  .gallery-home{
+    top: 12px;
+    left: 12px;
+  }
+  .comment-btn,
+  .design-btn,
+  .gallery-home{
+    padding: 8px 10px;
+  }
+  .gallery-bottom{
+    padding: 12px;
+    gap: 12px;
+  }
+  .g-desc{
+    max-width: 55%;
+  }
+  .gallery-track{                 /* 양쪽 흐림을 좁게 */
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent);
+            mask-image: linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent);
+  }
+  .gallery-caption{
+    max-width: 70vw;
+  }
+
+  /* 설계하기 방: 바닥을 손가락으로 밀어서 둘러보기 + 안내 문구 */
+  .design-canvas{
+    overflow: auto;
+  }
+  .design-title{
+    top: 58px;
+  }
+  .design-mobile-note{
+    display: block;
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    padding: 8px 10px;
+    border: 1px solid #111;
+    background: #f4f3ef;
+    font-size: 11px;
+    line-height: 1.5;
+    word-break: keep-all;
+    pointer-events: none;
+  }
+  .design-status{
+    bottom: 64px;
+  }
+
+  /* 그림판: 도구는 위에 가로 한 줄, 도화지는 화면 폭 가득 */
+  .paint{
+    padding: 8px;
+  }
+  .paint-window{
+    overflow-y: auto;
+  }
+  .paint-body{
+    flex-direction: column;
+  }
+  .paint-tools{
+    flex-direction: row;
+    flex-wrap: wrap;              /* 폭이 모자라면 두 줄로 */
+    width: auto;
+    border-right: none;
+  }
+  .paint-tools [data-tool],
+  .paint-undo{
+    flex: 1 1 auto;
+    padding: 10px 8px;
+    border-right: 1px solid #000;
+    text-align: center;
+    white-space: nowrap;
+  }
+  .paint-sizes{
+    flex: 1 1 auto;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding: 0 8px;
+    border-bottom: 1px solid #000;
+  }
+  .paint-sizes button{
+    width: 32px;
+    height: 32px;
+    padding: 0 5px;
+  }
+  .paint-canvas-wrap{
+    align-self: stretch;
+  }
+  .paint-bottom{
+    padding: 10px 12px;
+  }
+  .paint-current{
+    width: 36px;
+    height: 36px;
+  }
+  .paint-palette{
+    flex: 1;
+    grid-template-columns: repeat(14, minmax(0, 1fr));
+    grid-auto-rows: 20px;
+  }
+  .paint-upload{
+    flex-wrap: wrap;
+  }
+  .paint-upload select{
+    flex: 1 1 100%;
+    border-right: none;
+    border-bottom: 1px solid #000;
+  }
+  .paint-upload input{
+    flex: 1 1 50%;
+    border-bottom: 1px solid #000;
+  }
+  .paint-upload input:nth-of-type(2){
+    border-right: none;
+  }
+  .paint-upload-go,
+  .paint-upload-cancel{
+    flex: 1;
+    padding: 10px;
+  }
+}

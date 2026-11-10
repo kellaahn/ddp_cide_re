@@ -284,7 +284,7 @@ function layout() {
   const sizes = items.map((item, i) => {
     const t = Math.max(0, 1 - Math.abs(i - pos)); // 가운데면 1, 한 칸 이상 떨어지면 0
     const maxH = vh * (SMALL + (BIG - SMALL) * t);
-    const maxW = maxH * MAX_WIDE;
+    const maxW = Math.min(maxH * MAX_WIDE, window.innerWidth * 0.8);   // 휴대폰처럼 좁은 화면에선 화면 폭의 80%까지
     const nw = Number(item.dataset.w);
     const nh = Number(item.dataset.h);
     if (!nw || !nh) return { w: maxH * RATIO, h: maxH };   // 회색 칸, 아직 불러오는 중
@@ -367,6 +367,36 @@ gallery.addEventListener('wheel', (e) => {
   clearTimeout(snapTimer);
   snapTimer = setTimeout(() => goTo(Math.round(target)), 150);
 }, { passive: false });
+
+// 휴대폰: 손가락으로 좌우로 밀면 작품이 넘어감
+let touchX = null;
+let touchY = 0;
+let touchBase = 0;
+let swiping = false;
+gallery.addEventListener('touchstart', (e) => {
+  if (e.touches.length !== 1 || e.target.closest('button, .comment-text')) return;
+  touchX = e.touches[0].clientX;
+  touchY = e.touches[0].clientY;
+  touchBase = Math.round(target);
+  swiping = false;
+}, { passive: true });
+gallery.addEventListener('touchmove', (e) => {
+  if (touchX === null) return;
+  const dx = e.touches[0].clientX - touchX;
+  const dy = e.touches[0].clientY - touchY;
+  if (!swiping && Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) swiping = true;
+  if (!swiping) return;
+  e.preventDefault();
+  goTo(touchBase - dx / (window.innerWidth * 0.5));   // 손가락을 따라 움직이기
+}, { passive: false });
+gallery.addEventListener('touchend', (e) => {
+  if (touchX === null) return;
+  const dx = e.changedTouches[0].clientX - touchX;
+  touchX = null;
+  if (!swiping) return;
+  // 조금만 밀어도 한 작품씩 넘어가게
+  goTo(dx < -40 ? touchBase + 1 : dx > 40 ? touchBase - 1 : touchBase);
+});
 
 document.addEventListener('keydown', (e) => {
   if (gallery.hidden) return;
@@ -560,7 +590,8 @@ function closeDesign() {
 // 캔버스 기준 좌표
 function toLocal(e) {
   const r = canvas.getBoundingClientRect();
-  return { x: e.clientX - r.left, y: e.clientY - r.top };
+  // 휴대폰에서 바닥을 옆으로 밀어 본 만큼 더해서 (컴퓨터에선 0)
+  return { x: e.clientX - r.left + canvas.scrollLeft, y: e.clientY - r.top + canvas.scrollTop };
 }
 
 // 빈 곳 클릭 → 사진 고르기 → 클릭한 자리에 놓기
